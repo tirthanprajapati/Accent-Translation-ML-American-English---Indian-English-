@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const connectDB = require('./db'); // new addition
 
 const authRoutes = require('./Routes/auth');
 const userRoutes = require('./Routes/user');
@@ -11,6 +12,9 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 const port = process.env.PORT || 5000;
+
+// Connect to MongoDB
+connectDB();
 
 // Global Middlewares
 app.use(cors());
