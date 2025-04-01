@@ -1,18 +1,20 @@
 const express = require('express');
 const { authenticateToken } = require('../middleware/authenticationToken');
-const { readData, writeData } = require('../utils/dataStore');
+const Conversion = require('../models/Conversion');
 
 const router = express.Router();
-const conversionsFile = 'data/conversions.json';
 
 // GET /api/history - with pagination
-router.get('/', authenticateToken, (req, res, next) => {
+router.get('/', authenticateToken, async (req, res, next) => {
   try {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
-    const allConversions = readData(conversionsFile, []).filter(c => c.userId === req.user.id);
-    const totalCount = allConversions.length;
-    const conversions = allConversions.slice((page - 1) * limit, page * limit);
+    const query = { userId: req.user.id };
+    const totalCount = await Conversion.countDocuments(query);
+    const conversions = await Conversion.find(query)
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .exec();
     res.json({ conversions, totalCount });
   } catch (error) {
     next(error);
@@ -20,10 +22,9 @@ router.get('/', authenticateToken, (req, res, next) => {
 });
 
 // GET /api/history/:id
-router.get('/:id', authenticateToken, (req, res, next) => {
+router.get('/:id', authenticateToken, async (req, res, next) => {
   try {
-    const conversions = readData(conversionsFile, []);
-    const conversion = conversions.find(c => c.id === req.params.id && c.userId === req.user.id);
+    const conversion = await Conversion.findOne({ _id: req.params.id, userId: req.user.id });
     if (!conversion)
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Conversion not found' } });
     res.json(conversion);
@@ -33,14 +34,11 @@ router.get('/:id', authenticateToken, (req, res, next) => {
 });
 
 // DELETE /api/history/:id
-router.delete('/:id', authenticateToken, (req, res, next) => {
+router.delete('/:id', authenticateToken, async (req, res, next) => {
   try {
-    let conversions = readData(conversionsFile, []);
-    const index = conversions.findIndex(c => c.id === req.params.id && c.userId === req.user.id);
-    if (index === -1)
+    const conversion = await Conversion.findOneAndDelete({ _id: req.params.id, userId: req.user.id });
+    if (!conversion)
       return res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Conversion not found' } });
-    conversions.splice(index, 1);
-    writeData(conversionsFile, conversions);
     res.json({ message: 'Conversion record deleted successfully' });
   } catch (error) {
     next(error);
